@@ -1,10 +1,13 @@
 # Caikit NLP
 
-`caikit_nlp` is a [Caikit](https://github.com/caikit/caikit) library that currently provides [PEFT prompt tuning](https://github.com/huggingface/peft) and MPT (multi-task prompt tuning) functionalities.
+`caikit_nlp` is a [Caikit](https://github.com/caikit/caikit) library that currently provides functionalities including:
+- [PEFT prompt tuning](https://github.com/huggingface/peft)
+- MPT (multi-task prompt tuning)
+- General NLP module data models and capabilities such as tokenization, text and token classification, etc.
 
-More information on MPT can be found at: https://arxiv.org/abs/2303.02861
-
-Currently causal language models and sequence-to-sequence models are supported.
+#### Prompt tuning details
+- More information on MPT can be found at: https://arxiv.org/abs/2303.02861
+- Currently causal language models and sequence-to-sequence models are supported.
 
 #### Notes
 
