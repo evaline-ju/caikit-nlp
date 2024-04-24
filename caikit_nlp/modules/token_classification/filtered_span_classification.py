@@ -17,7 +17,8 @@ classifications can be filtered by score threshold and label(s).
 At this time this module is only designed for inference"""
 
 # Standard
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Union
+import itertools
 import os
 
 # First Party
@@ -122,7 +123,7 @@ class FilteredSpanClassification(ModuleBase):
 
     @TokenClassificationTask.taskmethod()
     def run(
-        self, text: str, threshold: Optional[float] = None
+        self, text: str, threshold: Optional[Union[float, int]] = None
     ) -> TokenClassificationResults:
         """Run classification on text split into spans. Returns results
         based on score threshold for labels that are to be outputted
@@ -130,14 +131,24 @@ class FilteredSpanClassification(ModuleBase):
         Args:
             text: str
                 Document to run classification on
-            threshold: float
+            threshold: float | int
                 (Optional) Threshold based on which to return score results
 
         Returns:
             TokenClassificationResults
         """
+        error.type_check("<NLP82129006E>", str, text=text)
+        error.type_check(
+            "<NLP01414077E>", float, int, allow_none=True, threshold=threshold
+        )
+
         if threshold is None:
             threshold = self.default_threshold
+        if not text:
+            # Allow empty text case to fall through - some tokenizers or
+            # classifiers may error on this
+            return TokenClassificationResults(results=[])
+
         token_classification_results = []
         if self.classification_task == TextClassificationTask:
             # Split document into spans
@@ -181,7 +192,7 @@ class FilteredSpanClassification(ModuleBase):
 
     @TokenClassificationTask.taskmethod(input_streaming=True, output_streaming=True)
     def run_bidi_stream(
-        self, text_stream: Iterable[str], threshold: Optional[float] = None
+        self, text_stream: Iterable[str], threshold: Optional[Union[float, int]] = None
     ) -> Iterable[TokenClassificationStreamResult]:
         """Run bi-directional streaming inferencing for this module.
         Run classification on text split into spans. Returns results
@@ -190,17 +201,31 @@ class FilteredSpanClassification(ModuleBase):
         Args:
             text_stream: Iterable[str]
                 Text stream to run classification on
-            threshold: float
+            threshold: float | int
                 (Optional) Threshold based on which to return score results
 
         Returns:
             Iterable[TokenClassificationStreamResult]
         """
+        error.type_check(
+            "<NLP96166348E>", float, int, allow_none=True, threshold=threshold
+        )
         # TODO: For optimization implement window based approach.
         if threshold is None:
             threshold = self.default_threshold
 
-        for span_output in self._stream_span_output(text_stream):
+        # Avoid length check here since it can be time consuming to iterate through stream
+        # Tee stream to 2 - one to check emptiness, one for full iteration + analysis
+        text_streams = itertools.tee(text_stream, 2)
+        try:
+            next(text_streams[0])
+        except StopIteration:
+            # Types on the stream are checked later on iteration
+            # Allow empty text case to fall through - some tokenizers or
+            # classifiers may error on this
+            yield TokenClassificationStreamResult(results=[], processed_index=0)
+
+        for span_output in self._stream_span_output(text_streams[1]):
             classification_result = self.classifier.run(span_output.text)
             results_to_end_of_span = False
             for classification in classification_result.results:
@@ -344,6 +369,7 @@ class FilteredSpanClassification(ModuleBase):
             return token
 
         for text in text_stream:
+            error.type_check("<NLP38357927E>", str, text=text)
             stream_accumulator += text
             # In order to avoid processing all of the spans again, we only
             # send out the spans that are not yet finalized in detected_spans
